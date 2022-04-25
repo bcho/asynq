@@ -43,7 +43,7 @@ type Server struct {
 	// wait group to wait for all goroutines to finish.
 	wg            sync.WaitGroup
 	forwarder     *forwarder
-	processor     *processor
+	processor     Processor
 	syncer        *syncer
 	heartbeater   *heartbeater
 	subscriber    *subscriber
@@ -608,7 +608,7 @@ func (srv *Server) Start(handler Handler) error {
 	if handler == nil {
 		return fmt.Errorf("asynq: server cannot run with nil handler")
 	}
-	srv.processor.handler = handler
+	srv.processor.SetHandler(handler)
 
 	if err := srv.start(); err != nil {
 		return err
@@ -621,7 +621,7 @@ func (srv *Server) Start(handler Handler) error {
 	srv.syncer.start(&srv.wg)
 	srv.recoverer.start(&srv.wg)
 	srv.forwarder.start(&srv.wg)
-	srv.processor.start(&srv.wg)
+	srv.processor.Start(&srv.wg)
 	srv.janitor.start(&srv.wg)
 	srv.aggregator.start(&srv.wg)
 	return nil
@@ -664,7 +664,7 @@ func (srv *Server) Shutdown() {
 	// processor -> syncer (via syncCh)
 	// processor -> heartbeater (via starting, finished channels)
 	srv.forwarder.shutdown()
-	srv.processor.shutdown()
+	srv.processor.Shutdown()
 	srv.recoverer.shutdown()
 	srv.syncer.shutdown()
 	srv.subscriber.shutdown()
@@ -694,6 +694,6 @@ func (srv *Server) Stop() {
 	srv.state.mu.Unlock()
 
 	srv.logger.Info("Stopping processor")
-	srv.processor.stop()
+	srv.processor.Stop()
 	srv.logger.Info("Processor stopped")
 }

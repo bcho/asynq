@@ -127,10 +127,11 @@ func TestServerWithRedisDown(t *testing.T) {
 	r := rdb.NewRDB(setup(t))
 	testBroker := testbroker.NewTestBroker(r)
 	srv := NewServer(RedisClientOpt{Addr: ":6379"}, Config{LogLevel: testLogLevel})
+	processor := srv.processor.(*processor)
 	srv.broker = testBroker
 	srv.forwarder.broker = testBroker
 	srv.heartbeater.broker = testBroker
-	srv.processor.broker = testBroker
+	processor.broker = testBroker
 	srv.subscriber.broker = testBroker
 	testBroker.Sleep()
 
@@ -160,10 +161,11 @@ func TestServerWithFlakyBroker(t *testing.T) {
 	testBroker := testbroker.NewTestBroker(r)
 	redisConnOpt := getRedisConnOpt(t)
 	srv := NewServer(redisConnOpt, Config{LogLevel: testLogLevel})
+	processor := srv.processor.(*processor)
 	srv.broker = testBroker
 	srv.forwarder.broker = testBroker
 	srv.heartbeater.broker = testBroker
-	srv.processor.broker = testBroker
+	processor.broker = testBroker
 	srv.subscriber.broker = testBroker
 
 	c := NewClient(redisConnOpt)

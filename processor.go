@@ -24,6 +24,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
+type Processor interface {
+	Start(*sync.WaitGroup)
+	Shutdown()
+	Stop()
+	SetHandler(Handler)
+}
+
 type processor struct {
 	logger *log.Logger
 	broker base.Broker
@@ -118,6 +125,22 @@ func newProcessor(params processorParams) *processor {
 		starting:        params.starting,
 		finished:        params.finished,
 	}
+}
+
+func (p *processor) SetHandler(h Handler) {
+	p.handler = h
+}
+
+func (p *processor) Start(wg *sync.WaitGroup) {
+	p.start(wg)
+}
+
+func (p *processor) Shutdown() {
+	p.shutdown()
+}
+
+func (p *processor) Stop() {
+	p.stop()
 }
 
 // Note: stops only the "processor" goroutine, does not stop workers.
