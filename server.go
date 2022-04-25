@@ -220,6 +220,8 @@ type Config struct {
 	//
 	// If unset or nil, the group aggregation feature will be disabled on the server.
 	GroupAggregator GroupAggregator
+
+	ProcessorProvider ProcessorProvider
 }
 
 // GroupAggregator aggregates a group of tasks into one before the tasks are passed to the Handler.
@@ -489,21 +491,26 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 		broker:       rdb,
 		cancelations: cancels,
 	})
-	processor := newProcessor(processorParams{
-		logger:          logger,
-		broker:          rdb,
-		retryDelayFunc:  delayFunc,
-		baseCtxFn:       baseCtxFn,
-		isFailureFunc:   isFailureFunc,
-		syncCh:          syncCh,
-		cancelations:    cancels,
-		concurrency:     n,
-		queues:          queues,
-		strictPriority:  cfg.StrictPriority,
-		errHandler:      cfg.ErrorHandler,
-		shutdownTimeout: shutdownTimeout,
-		starting:        starting,
-		finished:        finished,
+
+	processProvider := cfg.ProcessorProvider
+	if processProvider == nil {
+		processProvider = func(params ProcessorParams) Processor { return newProcessor(params) }
+	}
+	processor := processProvider(ProcessorParams{
+		Logger:          logger,
+		Broker:          rdb,
+		RetryDelayFunc:  delayFunc,
+		BaseCtxFn:       baseCtxFn,
+		IsFailureFunc:   isFailureFunc,
+		SyncCh:          syncCh,
+		Cancelations:    cancels,
+		Concurrency:     n,
+		Queues:          queues,
+		StrictPriority:  cfg.StrictPriority,
+		ErrHandler:      cfg.ErrorHandler,
+		ShutdownTimeout: shutdownTimeout,
+		Starting:        starting,
+		Finished:        finished,
 	})
 	recoverer := newRecoverer(recovererParams{
 		logger:         logger,

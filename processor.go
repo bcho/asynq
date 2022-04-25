@@ -31,6 +31,25 @@ type Processor interface {
 	SetHandler(Handler)
 }
 
+type ProcessorParams struct {
+	Logger          *log.Logger
+	Broker          base.Broker
+	BaseCtxFn       func() context.Context
+	RetryDelayFunc  RetryDelayFunc
+	IsFailureFunc   func(error) bool
+	SyncCh          chan<- *syncRequest
+	Cancelations    *base.Cancelations
+	Concurrency     int
+	Queues          map[string]int
+	StrictPriority  bool
+	ErrHandler      ErrorHandler
+	ShutdownTimeout time.Duration
+	Starting        chan<- *workerInfo
+	Finished        chan<- *base.TaskMessage
+}
+
+type ProcessorProvider func(ProcessorParams) Processor
+
 type processor struct {
 	logger *log.Logger
 	broker base.Broker
@@ -79,51 +98,34 @@ type processor struct {
 	finished chan<- *base.TaskMessage
 }
 
-type processorParams struct {
-	logger          *log.Logger
-	broker          base.Broker
-	baseCtxFn       func() context.Context
-	retryDelayFunc  RetryDelayFunc
-	isFailureFunc   func(error) bool
-	syncCh          chan<- *syncRequest
-	cancelations    *base.Cancelations
-	concurrency     int
-	queues          map[string]int
-	strictPriority  bool
-	errHandler      ErrorHandler
-	shutdownTimeout time.Duration
-	starting        chan<- *workerInfo
-	finished        chan<- *base.TaskMessage
-}
-
 // newProcessor constructs a new processor.
-func newProcessor(params processorParams) *processor {
-	queues := normalizeQueues(params.queues)
+func newProcessor(params ProcessorParams) *processor {
+	queues := normalizeQueues(params.Queues)
 	orderedQueues := []string(nil)
-	if params.strictPriority {
+	if params.StrictPriority {
 		orderedQueues = sortByPriority(queues)
 	}
 	return &processor{
-		logger:          params.logger,
-		broker:          params.broker,
-		baseCtxFn:       params.baseCtxFn,
+		logger:          params.Logger,
+		broker:          params.Broker,
+		baseCtxFn:       params.BaseCtxFn,
 		clock:           timeutil.NewRealClock(),
 		queueConfig:     queues,
 		orderedQueues:   orderedQueues,
-		retryDelayFunc:  params.retryDelayFunc,
-		isFailureFunc:   params.isFailureFunc,
-		syncRequestCh:   params.syncCh,
-		cancelations:    params.cancelations,
+		retryDelayFunc:  params.RetryDelayFunc,
+		isFailureFunc:   params.IsFailureFunc,
+		syncRequestCh:   params.SyncCh,
+		cancelations:    params.Cancelations,
 		errLogLimiter:   rate.NewLimiter(rate.Every(3*time.Second), 1),
-		sema:            make(chan struct{}, params.concurrency),
+		sema:            make(chan struct{}, params.Concurrency),
 		done:            make(chan struct{}),
 		quit:            make(chan struct{}),
 		abort:           make(chan struct{}),
-		errHandler:      params.errHandler,
+		errHandler:      params.ErrHandler,
 		handler:         HandlerFunc(func(ctx context.Context, t *Task) error { return fmt.Errorf("handler not set") }),
-		shutdownTimeout: params.shutdownTimeout,
-		starting:        params.starting,
-		finished:        params.finished,
+		shutdownTimeout: params.ShutdownTimeout,
+		starting:        params.Starting,
+		finished:        params.Finished,
 	}
 }
 
